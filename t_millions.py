@@ -40,7 +40,6 @@ QUESTIONS = [
      'answers': ['сходка', 'вече', 'базар', 'дума'], 'right_answer': 'вече'}
 ]
 
-
 """"
 настройка для обхода блокировки Telegram
 #telebot.apihelper.proxy = {'https': 'socks5://stepik.akentev.com:1080'}
@@ -100,7 +99,6 @@ def base_handler(message):
         ANS_RIGHT = QUESTIONS[QUESTION_ID]['right_answer']
         print(QUESTION_ID, VAR_ANSWERS, ANS_RIGHT)
         bot.reply_to(message, str(QUESTIONS[QUESTION_ID]['question']) + ': ' + str(QUESTIONS[QUESTION_ID]['answers']))
-        # bot.reply_to(message, 'Какую площадь имеет клетка стандартной школьной тетрадки: 0,25; 1,0; 0,5; 1,25')
         user_states[message.from_user.id] = ASK_QUESTION_STATE
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Если хочешь поиграть, напиши: "давай вопрос"')
@@ -117,15 +115,13 @@ def ask_question(message):
         user_faults[user_id] = 0
     print(QUESTION_ID, VAR_ANSWERS, ANS_RIGHT)
     print(message.text.lower().strip(), ANS_RIGHT)
-    if (message.text.lower().strip() == ANS_RIGHT): # '0,25':
+    if (message.text.lower().strip() == ANS_RIGHT):  # '0,25':
         bot.reply_to(message, 'Правильно!' + '\n' + \
                      'Если хочешь сыграть ещё, напиши: "да", если уже устал, напиши: "нет"')
         user_faults[user_id] = 0
         user_results[user_id][1] += 1
         user_states[message.from_user.id] = BASE_STATE
     elif (message.text.lower().strip() in VAR_ANSWERS):
-    # elif (message.text.lower().strip() == '1,0') or (message.text.lower().strip() == '1,25') \
-    #         or (message.text.lower().strip() == '0,5'):
         user_faults[user_id] += 1
         if (user_faults[user_id] == 2):
             bot.reply_to(message, 'Неправильно... Увы, ты проиграл :(' + '\n' + \
