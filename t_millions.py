@@ -1,22 +1,23 @@
 import telebot
+from telebot import types
 import random
 
 from config import token
 
-# token = '1064357077:AAHg0oamqbvoDmRL7Nu7gGEZvi_W7aeHSjg'
-
 bot = telebot.TeleBot(token)
 
+bot_users = []
 user_states = {}
 user_results = {}
 user_faults = {}
 
 GREETINGS = ['hi', 'привет']
-GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да']
+GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да', '?', 'вопрос']
 CANCEL_QUESTION = ['не хочу', 'нет', 'надоело', 'достал', 'отвали']
-SHOW_RESULTS = ['покажи счёт', 'какой счёт', 'результат игры', 'счет', 'счёт']
+SHOW_RESULTS = ['покажи счёт', 'какой счёт', 'результат игры', 'счет', 'счёт', 'итог']
 
 ANSWER_BASE = 'Я тебя не понял :('
+NEW_USER = 'new'
 BASE_STATE = 'base'
 ASK_QUESTION_STATE = 'ask_question'
 
@@ -59,16 +60,40 @@ def dispatcher(message):
     :return: вызов необходимого обработчика с учетом статуса игрока в дереве вопросов
     """
     user_id = message.from_user.id
+
     user_state = user_states.get(user_id, BASE_STATE)
+    #    user_state = user_states.get(user_id, NEW_USER)
+    if user_id not in bot_users:
+        bot_users.append(user_id)
     if user_id not in user_results:
         user_results[user_id] = [0, 0]
 
-    if user_state == BASE_STATE:
+    if user_state == NEW_USER:
+        new_user_handler(message)
+    elif user_state == BASE_STATE:
         base_handler(message)
     elif user_state == ASK_QUESTION_STATE:
         ask_question(message)
     else:
         bot.reply_to(message, ANSWER_BASE)
+
+
+def new_user_handler(message):
+    """
+    Обработка входа нового участника игры
+    :param message: сообщение игрока
+    :return: Приветствие игрока, перевод в статус BASE_STATE
+    """
+    user_id = message.from_user.id
+    if message.from_user.first_name is not None:
+        u_name = str(message.from_user.first_name)
+    else:
+        u_name = 'Незнакомец(ка)'
+    mess = 'Привет, ' + u_name + '!\nЭто бот-игра "Кто хочет стать миллионером"\n' + \
+           'Если хочешь поиграть, напиши: "давай вопрос"'
+    bot.send_message(message, mess)
+    user_states[user_id] = BASE_STATE
+    print(bot_users)
 
 
 def base_handler(message):
@@ -79,14 +104,18 @@ def base_handler(message):
     """
     user_id = message.from_user.id
     if message.text.lower().strip() == '/start':
-        bot.reply_to(message, 'Это бот-игра в "Кто хочет стать миллионером"' + '\n' + \
+        bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' + \
                      'Если хочешь поиграть, напиши: "давай вопрос"')
     elif message.text.lower().strip() in GREETINGS:
-        bot.reply_to(message, 'Ну, Привет! ' + str(message.from_user.first_name) + '\n' + \
-                     'Если хочешь поиграть, напиши: "давай вопрос"')
+        if message.from_user.first_name is not None:
+            bot.reply_to(message, 'Ну, Привет, ' + str(message.from_user.first_name) + '!\n' + \
+                         'Если хочешь поиграть, напиши: "давай вопрос"')
+        else:
+            bot.reply_to(message, 'Ну, Привет, Незнакомец(ка)!' + '\n' + \
+                         'Если хочешь поиграть, напиши: "давай вопрос"')
     elif message.text.lower().strip() in CANCEL_QUESTION:
         bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' + \
-                     'Как надумаешь - возвращайся. Я буду ждать вечно... :)')
+                     'Как надумаешь - возвращайся.\nЯ буду ждать тебя... :)')
     elif message.text.lower().strip() in SHOW_RESULTS:
         bot.reply_to(message, 'Текущий счет: Твоих Побед - ' + str(user_results[user_id][1]) + \
                      '; Поражений - ' + str(user_results[user_id][0]))
@@ -98,7 +127,13 @@ def base_handler(message):
         global ANS_RIGHT
         ANS_RIGHT = QUESTIONS[QUESTION_ID]['right_answer']
         print(QUESTION_ID, VAR_ANSWERS, ANS_RIGHT)
-        bot.reply_to(message, str(QUESTIONS[QUESTION_ID]['question']) + ': ' + str(QUESTIONS[QUESTION_ID]['answers']))
+        # create keyboard and buttons
+        #    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+        keyboard.add(types.KeyboardButton(VAR_ANSWERS[0]), types.KeyboardButton(VAR_ANSWERS[1]),
+                     types.KeyboardButton(VAR_ANSWERS[2]), types.KeyboardButton(VAR_ANSWERS[3]))
+        bot.reply_to(message, str(QUESTIONS[QUESTION_ID]['question']) + '\nВыбери варианты ответов',
+                     reply_markup=keyboard)
         user_states[message.from_user.id] = ASK_QUESTION_STATE
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Если хочешь поиграть, напиши: "давай вопрос"')
@@ -115,9 +150,11 @@ def ask_question(message):
         user_faults[user_id] = 0
     print(QUESTION_ID, VAR_ANSWERS, ANS_RIGHT)
     print(message.text.lower().strip(), ANS_RIGHT)
-    if (message.text.lower().strip() == ANS_RIGHT):  # '0,25':
+
+    if (message.text.lower().strip() == ANS_RIGHT):
         bot.reply_to(message, 'Правильно!' + '\n' + \
-                     'Если хочешь сыграть ещё, напиши: "да", если уже устал, напиши: "нет"')
+                     'Если хочешь сыграть ещё, напиши: "да", если уже устал, напиши: "нет"',
+                     reply_markup=types.ReplyKeyboardRemove())
         user_faults[user_id] = 0
         user_results[user_id][1] += 1
         user_states[message.from_user.id] = BASE_STATE
@@ -125,7 +162,8 @@ def ask_question(message):
         user_faults[user_id] += 1
         if (user_faults[user_id] == 2):
             bot.reply_to(message, 'Неправильно... Увы, ты проиграл :(' + '\n' + \
-                         'Если ты готов победить, напиши: "да", если уже устал, напиши: "нет"')
+                         'Если ты готов победить, напиши: "да", если уже устал, напиши: "нет"',
+                         reply_markup=types.ReplyKeyboardRemove())
             user_faults[user_id] = 0
             user_results[user_id][0] += 1
             user_states[message.from_user.id] = BASE_STATE
