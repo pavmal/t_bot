@@ -2,21 +2,13 @@ import telebot
 from telebot import types
 import random
 import time
-#from itertools import permutations
+# from itertools import permutations
 import requests
-
-#from config import token, URL_QUESTIONS
-#from config import *
 import config
 
 bot = telebot.TeleBot(config.token)
 
-bot_users = []
-user_states = {}
-user_results = {}
-user_faults = {}
-user_complex = {}
-user_data = {}
+all_user_data = {}
 
 GREETINGS = ['hi', 'привет']
 GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да', '?', 'вопрос']
@@ -28,21 +20,6 @@ ANSWER_BASE = 'Я тебя не понял :('
 NEW_USER = 'new'
 BASE_STATE = 'base'
 ASK_QUESTION_STATE = 'ask_question'
-
-QUESTIONS = [
-    {'id': 0, 'question': 'Туристы, приезжающие на Майорку, обязаны заплатить налог на …?',
-     'answers': ['солнце', 'купальник', 'пальмы', 'песок'], 'right_answer': 'солнце'},
-    {'id': 1, 'question': 'Что является символом Копенгагена?',
-     'answers': ['лебедь', 'кот в мешке', 'русалочка', 'лев'], 'right_answer': 'русалочка'},
-    {'id': 2, 'question': 'Высота Останкинской башни ... метров',
-     'answers': ['120', '540', '360', '610'], 'right_answer': '540'},
-    {'id': 3, 'question': 'Какая птица олицетворяет символ мудрости?',
-     'answers': ['сова', 'жар-птица', 'орёл', 'птица феникс'], 'right_answer': 'сова'},
-    {'id': 4, 'question': 'Народное собрание в древней и средневековой Руси?',
-     'answers': ['сходка', 'вече', 'базар', 'дума'], 'right_answer': 'вече'},
-    {'id': 5, 'question': 'Самый большой материк на Земле?',
-     'answers': ['Европа', 'Австралия', 'Азия', 'Антарктида'], 'right_answer': 'Азия'}
-]
 
 """"
 настройка для обхода блокировки Telegram
@@ -63,28 +40,24 @@ def dispatcher(message):
     :return: вызов необходимого обработчика с учетом статуса игрока в дереве вопросов
     """
     user_id = message.from_user.id
+    if user_id not in all_user_data:
+        all_user_data[user_id] = {}
+        all_user_data[user_id]['state'] = BASE_STATE
+        all_user_data[user_id]['results'] = [0, 0]
+        all_user_data[user_id]['faults'] = 0
+        all_user_data[user_id]['complex'] = 0
+        all_user_data[user_id]['questions'] = {}
 
-    user_state = user_states.get(user_id, BASE_STATE)
-    #    user_state = user_states.get(user_id, NEW_USER)
-
-    if user_id not in bot_users:
-        bot_users.append(user_id)
-    if user_id not in user_results:
-        user_results[user_id] = [0, 0]
-    if user_id not in user_complex:
-        user_complex[user_id] = 0
-
-    if user_state == NEW_USER:
+    if all_user_data[user_id]['state'] == NEW_USER:
         handler_new_member(message)
-    elif user_state == BASE_STATE:
+    elif all_user_data[user_id]['state'] == BASE_STATE:
         base_handler(message)
-    elif user_state == ASK_QUESTION_STATE:
+    elif all_user_data[user_id]['state'] == ASK_QUESTION_STATE:
         ask_question(message)
     else:
         bot.reply_to(message, ANSWER_BASE)
-
-#    photo_handler(message)
-#    sticker_handler(message)
+    #    photo_handler(message)
+    #    sticker_handler(message)
 
     # def new_user_handler(message):
     """
@@ -101,7 +74,7 @@ def handler_new_member(message):
     print('new member')
     #    print(bot.get_chat_member())
     bot.send_message(message.chat.id, "Добро пожаловать")
-    user_states[message.from_user.id] = BASE_STATE
+    all_user_data[message.from_user.id]['state'] = BASE_STATE
 
     user_id = message.from_user.id
     if message.from_user.first_name is not None:
@@ -111,20 +84,22 @@ def handler_new_member(message):
     mess = 'Привет, ' + u_name + '!\nЭто бот-игра "Кто хочет стать миллионером"\n' + \
            'Если хочешь поиграть, напиши: "давай вопрос"'
     bot.send_message(message, mess)
-    user_states[user_id] = BASE_STATE
-    print(bot_users)
+    all_user_data[user_id]['state'] = BASE_STATE
 
 
 @bot.message_handler(content_types=["photo"])
 def photo_handler(message):
-#    bot.send_sticker(message.sticker.file_id)
+    #    bot.send_sticker(message.sticker.file_id)
     print(message.from_user.id, message.photo[-1].file_id)
+
+
 #    bot.send_photo(message.from_user.id, message.photo[-1].file_id)
 
 @bot.message_handler(content_types=["sticker"])
 def sticker_handler(message):
     user_id = message.from_user.id
-    if user_results[user_id][1] == 1:
+    #    if user_results[user_id][1] == 1:
+    if all_user_data[user_id]['results'][1] == 3:
         bot.send_message(message, 'Уже взяты подряд 3 вопроса!!!\nТак держать!')
         time.sleep(1)
         bot.send_sticker(message.from_user.id, config.STICK_URL_03)
@@ -137,13 +112,14 @@ def get_question(q_complex):
     print(ans)
     ans_ok = response['answers'][0]
     random.shuffle(ans)
-#    perm = permutations(ans)
-#    ans_dop = [list(el) for el in list(perm)]
-#    ans = random.choices(ans_dop)[0]
+    #    perm = permutations(ans)
+    #    ans_dop = [list(el) for el in list(perm)]
+    #    ans = random.choices(ans_dop)[0]
     print(ans)
     res = {'question': qes, 'answers': ans, 'right_answer': ans_ok}
     print(res)
     return res
+
 
 def reward_winners(wins):
     stik_url = config.STICK_URL_00
@@ -165,54 +141,52 @@ def base_handler(message):
     :return: Ответ игроку в зависимости от обработки сообщения
     """
     user_id = message.from_user.id
-#    sticker_handler(message)
     if message.text.lower().strip() == '/start':
-        bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' + \
+        bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
                      'Если хочешь поиграть, напиши: "давай вопрос"')
     elif message.text.lower().strip() in GREETINGS:
         if message.from_user.first_name is not None:
-            bot.reply_to(message, 'Ну, Привет, ' + str(message.from_user.first_name) + '!\n' + \
+            bot.reply_to(message, 'Ну, Привет, ' + str(message.from_user.first_name) + '!\n' +
                          'Если хочешь поиграть, напиши: "давай вопрос"')
         else:
-            bot.reply_to(message, 'Ну, Привет, Незнакомец(ка)!' + '\n' + \
+            bot.reply_to(message, 'Ну, Привет, Незнакомец(ка)!' + '\n' +
                          'Если хочешь поиграть, напиши: "давай вопрос"')
     elif message.text.lower().strip() in CANCEL_QUESTION:
-        bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' + \
-                     'Результат игры: Твоих Побед - ' + str(user_results[user_id][1]) + \
-                     '; Поражений - ' + str(user_results[user_id][0]) + \
+        bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' +
+                     'Результат игры: Твоих Побед - ' + str(all_user_data[user_id]['results'][1]) +
+                     '; Поражений - ' + str(all_user_data[user_id]['results'][0]) +
                      '\nКак надумаешь - возвращайся.\nЯ буду ждать тебя... :)')
     elif message.text.lower().strip() in SHOW_RESULTS:
-        bot.reply_to(message, 'Текущий счет: Твоих Побед - ' + str(user_results[user_id][1]) + \
-                     '; Поражений - ' + str(user_results[user_id][0]))
+        bot.reply_to(message, 'Текущий счет: Твоих Побед - ' + str(all_user_data[user_id]['results'][1]) +
+                     '; Поражений - ' + str(all_user_data[user_id]['results'][0]))
     elif message.text.lower().strip() in GO_TO_QUESTION or message.text.lower().strip() in QUESTION_LEVEL:
         # проверка того, что это первый вопрос в сессии. Предлагаем выбрать уровень сложности
         if message.text.lower().strip() == QUESTION_LEVEL[0]:
-            user_complex[user_id] = 1
+            all_user_data[user_id]['complex'] = 1
         if message.text.lower().strip() == QUESTION_LEVEL[1]:
-            user_complex[user_id] = 2
+            all_user_data[user_id]['complex'] = 2
         if message.text.lower().strip() == QUESTION_LEVEL[2]:
-            user_complex[user_id] = 3
+            all_user_data[user_id]['complex'] = 3
 
-        if user_complex[user_id] == 0:
+        if all_user_data[user_id]['complex'] == 0:
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
             keyboard.add(types.KeyboardButton(QUESTION_LEVEL[0]),
                          types.KeyboardButton(QUESTION_LEVEL[1]),
                          types.KeyboardButton(QUESTION_LEVEL[2]))
             bot.reply_to(message, 'Выбери уровень сложности вопросов', reply_markup=keyboard)
         else:
-            user_data[user_id] = get_question(str(user_complex[user_id]))
-            print(user_data)
-            #           user_data[user_id] = QUESTIONS[random.choice([id for id in range(len(QUESTIONS))])]
+            all_user_data[user_id]['questions'] = get_question(str(all_user_data[user_id]['complex']))
+            #            print(all_user_data[user_id]['questions'])
 
             #    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-            keyboard.add(types.KeyboardButton(user_data[user_id]['answers'][0]),
-                         types.KeyboardButton(user_data[user_id]['answers'][1]),
-                         types.KeyboardButton(user_data[user_id]['answers'][2]),
-                         types.KeyboardButton(user_data[user_id]['answers'][3]))
-            bot.reply_to(message, str(user_data[user_id]['question']) + '\nВыбери варианты ответов',
+            keyboard.add(types.KeyboardButton(all_user_data[user_id]['questions']['answers'][0]),
+                         types.KeyboardButton(all_user_data[user_id]['questions']['answers'][1]),
+                         types.KeyboardButton(all_user_data[user_id]['questions']['answers'][2]),
+                         types.KeyboardButton(all_user_data[user_id]['questions']['answers'][3]))
+            bot.reply_to(message, str(all_user_data[user_id]['questions']['question']) + '\nВыбери варианты ответов',
                          reply_markup=keyboard)
-            user_states[message.from_user.id] = ASK_QUESTION_STATE
+            all_user_data[user_id]['state'] = ASK_QUESTION_STATE
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Если хочешь поиграть, напиши: "давай вопрос"')
 
@@ -224,44 +198,41 @@ def ask_question(message):
     :return: Результат обработки ответа на вопрос
     """
     user_id = message.from_user.id
-    if user_id not in user_faults:
-        user_faults[user_id] = 0
-
-    #    print(user_data)
-    if (message.text.lower().strip() == str(user_data[user_id]['right_answer']).lower().strip()):
+    if (message.text.lower().strip() == (str(all_user_data[user_id]['questions']['right_answer']).lower().strip())):
         bot.send_chat_action(user_id, 'typing')
         time.sleep(1)
-        user_faults[user_id] = 0
-        user_results[user_id][1] += 1
-        user_states[message.from_user.id] = BASE_STATE
+        all_user_data[user_id]['faults'] = 0
+        all_user_data[user_id]['results'][1] += 1
+        all_user_data[user_id]['state'] = BASE_STATE
         # check for user reward
-        if user_results[user_id][1] in [1, 3, 10, 25]:
-            str_url = reward_winners(user_results[user_id][1])
+        if all_user_data[user_id]['results'][1] in [1, 3, 10, 25]:
+            str_url = reward_winners(all_user_data[user_id]['results'][1])
             time.sleep(1)
-            str_mess = 'Правильно! \nУже взяты подряд ' + str(user_results[user_id][1]) + ' вопросов!!!\nТак держать!'
-            if user_results[user_id][1] == 25:
+            str_mess = 'Правильно! \nУже взяты подряд ' + str(
+                all_user_data[user_id]['results'][1]) + ' вопросов!!!\nТак держать!'
+            if all_user_data[user_id]['results'][1] == 25:
                 str_mess = str_mess + '\nОбъявляю тебя ПОБЕДИТЕЛЕМ ИГРЫ !!!'
             bot.reply_to(message, str_mess)
-#            sti = open(str_url, 'rb')
-#            bot.send_sticker(message.from_user.id, sti)
+            #            sti = open(str_url, 'rb')
+            #            bot.send_sticker(message.from_user.id, sti)
             bot.send_sticker(message.from_user.id, str_url)
-#            bot.send_sticker(message.from_user.id, 'FILEID')
+        #            bot.send_sticker(message.from_user.id, 'FILEID')
         else:
             bot.reply_to(message, 'Правильно! Молодец!!!')
         # general message for right answer
         bot.reply_to(message, 'Если хочешь сыграть ещё, напиши: "да", \nесли уже устал, напиши: "нет"',
                      reply_markup=types.ReplyKeyboardRemove())
 
-    elif (message.text.lower().strip() in str(user_data[user_id]['answers']).lower().strip()):
-        user_faults[user_id] += 1
-        if (user_faults[user_id] == 2):
-            bot.reply_to(message, 'Неправильно... Увы, ты проиграл :(' + '\n' + \
+    elif (message.text.lower().strip() in str(all_user_data[user_id]['questions']['answers']).lower().strip()):
+        all_user_data[user_id]['faults'] += 1
+        if (all_user_data[user_id]['faults'] == 2):
+            bot.reply_to(message, 'Неправильно... Увы, ты проиграл :(' + '\n' +
                          'Если ты готов победить, напиши: "да", \nесли уже устал, напиши: "нет"',
                          reply_markup=types.ReplyKeyboardRemove())
-            user_faults[user_id] = 0
-            user_results[user_id][0] += 1
-            #user_results[user_id][1] = 0  # обнуление выйгрышей N подряд вопросов
-            user_states[message.from_user.id] = BASE_STATE
+            all_user_data[user_id]['faults'] = 0
+            all_user_data[user_id]['results'][0] += 1
+            # user_results[user_id][1] = 0  # обнуление выйгрышей N подряд вопросов
+            all_user_data[user_id]['state'] = BASE_STATE
         else:
             bot.send_chat_action(user_id, 'typing')
             time.sleep(1)
