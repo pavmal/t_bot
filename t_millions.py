@@ -14,7 +14,7 @@ REDIS_URL = os.environ.get('REDIS_URL')
 all_user_data = {}
 
 GREETINGS = ['hi', 'привет']
-GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да', '?', 'вопрос']
+GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да', '+', 'вопрос']
 QUESTION_LEVEL = ['выбери уровень сложности вопросов', '1 - разминочный', '2 - средний', '3 - для эрудитов']
 CANCEL_QUESTION = ['не хочу', 'нет', 'надоело', 'достал', 'отвали']
 SHOW_RESULTS = ['покажи счёт', 'какой счёт', 'результат игры', 'счет', 'счёт', 'итог']
@@ -67,7 +67,7 @@ def dispatcher(message):
     """
     if message.text.lower().strip() == '/start':
         bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
-                     'Если хочешь поиграть, напиши: "давай вопрос" или "?"')
+                     'Если хочешь поиграть, напиши: "давай вопрос" или "+"')
 
     user_id = str(message.from_user.id)
     if REDIS_URL:  # если подключена база redis
@@ -94,7 +94,7 @@ def dispatcher(message):
         bot.reply_to(message, ANSWER_BASE)
     """ Оставил для возможной обработки фото и стикетов """
     #    photo_handler(message)
-    #sticker_handler(message)
+    # sticker_handler(message)
 
     # def new_user_handler(message):
     """
@@ -138,6 +138,8 @@ def sticker_handler(message):
 
     print(message.sticker.file_id)
     bot.send_sticker(message.from_user.id, message.sticker.file_id)
+
+
 #    config.OLAF_X = message.sticker.file_id
 #    config.OLAF_X = 'CAACAgIAAxkBAAIBqV6a_wVmXbJkxJK_SY9kJrzdEIzAAAK_AAMrXlMLZByzdc6EyDkYBA'
 #    print(config.OLAF_X)
@@ -205,12 +207,13 @@ def base_handler(message):
     if message.text.lower().strip() == '/start':
         pass  # обрабатывается в процедуре диспетчера
     elif message.text.lower().strip() in GREETINGS:
-        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши: "давай вопрос" или "?"'.format(
+        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши: "давай вопрос" или "+"'.format(
             str(message.from_user.first_name)))
 
     elif message.text.lower().strip() in CANCEL_QUESTION:
         bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' + result_mess +
-                     '\nКак надумаешь - возвращайся.\nЯ буду ждать тебя... :)')
+                     '\nКак надумаешь - возвращайся.\nЯ буду ждать тебя... :)',
+                     reply_markup=types.ReplyKeyboardRemove())
         bot.send_sticker(message.from_user.id, config.OLAF_00)
 
     elif message.text.lower().strip() in SHOW_RESULTS:
@@ -310,7 +313,7 @@ def ask_question(message):
 
 
 if __name__ == '__main__':
-#    if REDIS_URL:
-#        redis_db = redis.from_url(REDIS_URL)
-#        redis_db.delete('409088886')
+    #    if REDIS_URL:
+    #        redis_db = redis.from_url(REDIS_URL)
+    #        redis_db.delete('409088886')
     bot.polling()
