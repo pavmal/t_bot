@@ -37,7 +37,7 @@ def echo(message):
 
 def save_data(key, value):
     """
-    Сохранение данных по игроку в базн
+    Сохранение данных по игроку в базу redis
     """
     if REDIS_URL:
         redis_db = redis.from_url(REDIS_URL)
@@ -67,7 +67,7 @@ def dispatcher(message):
     """
     if message.text.lower().strip() == '/start':
         bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
-                     'Если хочешь поиграть, напиши: "давай вопрос"')
+                     'Если хочешь поиграть, напиши: "давай вопрос" или "?"')
 
     user_id = str(message.from_user.id)
     if REDIS_URL:  # если подключена база redis
@@ -82,8 +82,8 @@ def dispatcher(message):
         all_user_data[user_id]['faults'] = 0
         all_user_data[user_id]['complex'] = 0
         all_user_data[user_id]['questions'] = {}
-    #    print(all_user_data)
 
+    print('Состояние до вопроса:\n{}'.format(all_user_data))
     if all_user_data[user_id]['state'] == NEW_USER:
         handler_new_member(message)
     elif all_user_data[user_id]['state'] == BASE_STATE:
@@ -94,7 +94,7 @@ def dispatcher(message):
         bot.reply_to(message, ANSWER_BASE)
     """ Оставил для возможной обработки фото и стикетов """
     #    photo_handler(message)
-    #    sticker_handler(message)
+    #sticker_handler(message)
 
     # def new_user_handler(message):
     """
@@ -138,25 +138,23 @@ def sticker_handler(message):
 
     print(message.sticker.file_id)
     bot.send_sticker(message.from_user.id, message.sticker.file_id)
-    #    config.OLAF_X = message.sticker.file_id
-    config.OLAF_X = 'CAACAgIAAxkBAAIBqV6a_wVmXbJkxJK_SY9kJrzdEIzAAAK_AAMrXlMLZByzdc6EyDkYBA'
-    print(config.OLAF_X)
-    bot.send_sticker(message.from_user.id, config.OLAF_X)
+#    config.OLAF_X = message.sticker.file_id
+#    config.OLAF_X = 'CAACAgIAAxkBAAIBqV6a_wVmXbJkxJK_SY9kJrzdEIzAAAK_AAMrXlMLZByzdc6EyDkYBA'
+#    print(config.OLAF_X)
+#    bot.send_sticker(message.from_user.id, config.OLAF_X)
 
 
 def get_question(q_complex):
     response = requests.get(config.URL_QUESTIONS, params=q_complex).json()
     qes = response['question']
     ans = response['answers']
-    print(ans)
     ans_ok = response['answers'][0]
     random.shuffle(ans)
     #    perm = permutations(ans)
     #    ans_dop = [list(el) for el in list(perm)]
     #    ans = random.choices(ans_dop)[0]
-    print(ans)
     res = {'question': qes, 'answers': ans, 'right_answer': ans_ok}
-    print(res)
+    print('Вопрос:\n{}'.format(res))
     return res
 
 
@@ -167,7 +165,6 @@ def reward_winners(wins):
     :return: ссылка на картинку
     """
     stik_url = config.STICK_URL_00
-    print(stik_url)
     if wins == 3:
         stik_url = config.STICK_URL_03
     if wins == 10:
@@ -208,13 +205,13 @@ def base_handler(message):
     if message.text.lower().strip() == '/start':
         pass  # обрабатывается в процедуре диспетчера
     elif message.text.lower().strip() in GREETINGS:
-        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши: "давай вопрос"'.format(
+        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши: "давай вопрос" или "?"'.format(
             str(message.from_user.first_name)))
 
     elif message.text.lower().strip() in CANCEL_QUESTION:
         bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' + result_mess +
                      '\nКак надумаешь - возвращайся.\nЯ буду ждать тебя... :)')
-        bot.send_sticker(message.from_user.id, 'CAACAgIAAxkBAAIBeV6a-MlpOZmrxjC5q94yHtt5OeQrAALKAAMrXlMLB2VLhy5mA7sYBA')
+        bot.send_sticker(message.from_user.id, config.OLAF_00)
 
     elif message.text.lower().strip() in SHOW_RESULTS:
         bot.reply_to(message, result_mess)
@@ -248,7 +245,7 @@ def base_handler(message):
                          reply_markup=keyboard)
             all_user_data[user_id]['state'] = ASK_QUESTION_STATE
             save_data(user_id, json.dumps(all_user_data[user_id]))
-            print(all_user_data)
+            print('Состояние после выбора вопроса:\n{}'.format(all_user_data))
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Если хочешь поиграть, напиши: "давай вопрос"')
 
@@ -279,11 +276,7 @@ def ask_question(message):
             bot.reply_to(message, str_mess, reply_markup=types.ReplyKeyboardRemove())
             # str_url = reward_winners(all_user_data[user_id]['results'][1])  # ссылки на кота Кузю
             olaf_id = olaf_reward_winners(all_user_data[user_id]['results'][1])
-            try:
-                bot.send_sticker(message.from_user.id, olaf_id)
-            except Exception:
-                """ Почему-то не всегда подхватывается file_id стикера """
-                print('Error show sticker')
+            bot.send_sticker(message.from_user.id, olaf_id)
         #     bot.send_sticker(message.from_user.id, 'FILEID')
         else:
             bot.reply_to(message, 'Правильно! Молодец!!!', reply_markup=types.ReplyKeyboardRemove())
@@ -303,7 +296,7 @@ def ask_question(message):
             bot.reply_to(message, 'Неправильно :( У тебя ещё одна попытка')
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Выбери один из вариантов ответов')
-    print(all_user_data)
+    print('Состояние после ответа на вопрос:\n{}'.format(all_user_data))
     save_data(user_id, json.dumps(all_user_data[user_id]))
 
     #   если ошибочных ответов ноль, то игрок или выйграл или проиграл.
@@ -317,7 +310,7 @@ def ask_question(message):
 
 
 if __name__ == '__main__':
-    #    if REDIS_URL:
-    #        redis_db = redis.from_url(REDIS_URL)
-    #        redis_db.delete('409088886')
+#    if REDIS_URL:
+#        redis_db = redis.from_url(REDIS_URL)
+#        redis_db.delete('409088886')
     bot.polling()
