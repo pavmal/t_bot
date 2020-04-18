@@ -1,14 +1,48 @@
 import telebot
 from telebot import types
-import random
-import time
-# from itertools import permutations
+import random, time, os, json
 import requests
+import redis
 import config
+# from itertools import permutations
 
-bot = telebot.TeleBot(config.token)
-
+#bot = telebot.TeleBot(config.token)
+bot = telebot.TeleBot(os.environ['BOT_TOKEN'])
+REDIS_URL = os.environ.get('REDIS_URL')
 all_user_data = {}
+#all_user_data_str = ''
+# s = ''
+# with open('temp_data.txt', 'r', encoding='utf-8') as f:
+#     s = f.readline()
+# all_user_data = json.loads(s)
+# print(all_user_data)
+
+def save_data(key, value):
+#    data_str = '{"' + key + '": ' + json.dumps(all_user_data[key]) + '}'
+#    all_user_data_str = json.dumps(all_user_data[key])
+    if REDIS_URL:
+        redis_db = redis.from_url(REDIS_URL)
+        redis_db.set(key, value)
+#    else:
+#        all_user_data[key] = value
+#        open('temp_data.txt', 'w', encoding='utf-8').write(data_str)
+#    print(key, value)
+#    print(all_user_data)
+
+def load_data(key):
+    if REDIS_URL:
+        redis_db = redis.from_url(REDIS_URL)
+        return redis_db.get(key)
+    else:
+#        s = json.load(open('temp_data.txt', 'r', encoding='utf-8'))
+#        data = json.loads(s)
+#        print(type(s), s)
+        return all_user_data.get(key)
+
+
+#IS_HEROKU = os.environ.get('HEROKU', False)
+
+
 
 GREETINGS = ['hi', 'привет']
 GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да', '?', 'вопрос']
@@ -39,14 +73,21 @@ def dispatcher(message):
     :param message: сообщение игрока
     :return: вызов необходимого обработчика с учетом статуса игрока в дереве вопросов
     """
-    user_id = message.from_user.id
-    if user_id not in all_user_data:
+    user_id = str(message.from_user.id)
+    all_user_data[user_id] = load_data(user_id)
+    print(all_user_data)
+#    if user_id not in all_user_data:
+    if all_user_data[user_id] == None:
         all_user_data[user_id] = {}
         all_user_data[user_id]['state'] = BASE_STATE
         all_user_data[user_id]['results'] = [0, 0]
         all_user_data[user_id]['faults'] = 0
         all_user_data[user_id]['complex'] = 0
         all_user_data[user_id]['questions'] = {}
+#    else:
+#        pass
+#        all_user_data[user_id] = load_data(user_id)
+#    print(all_user_data)
 
     if all_user_data[user_id]['state'] == NEW_USER:
         handler_new_member(message)
@@ -71,12 +112,12 @@ def dispatcher(message):
 def handler_new_member(message):
     #    user_name = message.new_chat_member.first_name
     #    bot.send_message(message.chat.id, "Добро пожаловать, {0}!".format(user_name))
+    user_id = str(message.from_user.id)
     print('new member')
     #    print(bot.get_chat_member())
     bot.send_message(message.chat.id, "Добро пожаловать")
-    all_user_data[message.from_user.id]['state'] = BASE_STATE
+    all_user_data[user_id]['state'] = BASE_STATE
 
-    user_id = message.from_user.id
     if message.from_user.first_name is not None:
         u_name = str(message.from_user.first_name)
     else:
@@ -97,7 +138,7 @@ def photo_handler(message):
 
 @bot.message_handler(content_types=["sticker"])
 def sticker_handler(message):
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
     #    if user_results[user_id][1] == 1:
     if all_user_data[user_id]['results'][1] == 3:
         bot.send_message(message, 'Уже взяты подряд 3 вопроса!!!\nТак держать!')
@@ -130,8 +171,7 @@ def reward_winners(wins):
         stik_url = config.STICK_URL_10
     if wins == 25:
         stik_url = config.STICK_URL_25
-    print(stik_url)
-    return stik_url
+    return str(stik_url)
 
 
 def base_handler(message):
@@ -140,7 +180,7 @@ def base_handler(message):
     :param message: сообщение игрока
     :return: Ответ игроку в зависимости от обработки сообщения
     """
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
     if message.text.lower().strip() == '/start':
         bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
                      'Если хочешь поиграть, напиши: "давай вопрос"')
@@ -176,7 +216,6 @@ def base_handler(message):
             bot.reply_to(message, 'Выбери уровень сложности вопросов', reply_markup=keyboard)
         else:
             all_user_data[user_id]['questions'] = get_question(str(all_user_data[user_id]['complex']))
-            #            print(all_user_data[user_id]['questions'])
 
             #    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
@@ -187,6 +226,8 @@ def base_handler(message):
             bot.reply_to(message, str(all_user_data[user_id]['questions']['question']) + '\nВыбери варианты ответов',
                          reply_markup=keyboard)
             all_user_data[user_id]['state'] = ASK_QUESTION_STATE
+            save_data(user_id, json.dumps(all_user_data[user_id]))
+            print(all_user_data)
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Если хочешь поиграть, напиши: "давай вопрос"')
 
@@ -197,13 +238,14 @@ def ask_question(message):
     :param message: сообщение игрока - ответ на вопрос
     :return: Результат обработки ответа на вопрос
     """
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
     if (message.text.lower().strip() == (str(all_user_data[user_id]['questions']['right_answer']).lower().strip())):
         bot.send_chat_action(user_id, 'typing')
         time.sleep(1)
         all_user_data[user_id]['faults'] = 0
         all_user_data[user_id]['results'][1] += 1
         all_user_data[user_id]['state'] = BASE_STATE
+        save_data(user_id, json.dumps(all_user_data[user_id]))
         # check for user reward
         if all_user_data[user_id]['results'][1] in [1, 3, 10, 25]:
             str_url = reward_winners(all_user_data[user_id]['results'][1])
@@ -233,13 +275,16 @@ def ask_question(message):
             all_user_data[user_id]['results'][0] += 1
             # user_results[user_id][1] = 0  # обнуление выйгрышей N подряд вопросов
             all_user_data[user_id]['state'] = BASE_STATE
+            save_data(user_id, json.dumps(all_user_data[user_id]))
         else:
             bot.send_chat_action(user_id, 'typing')
             time.sleep(1)
             bot.reply_to(message, 'Неправильно :( У тебя ещё одна попытка')
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Выбери один из вариантов ответов')
+#    save_data('user_id')
 
 
 if __name__ == '__main__':
     bot.polling()
+

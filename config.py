@@ -1,0 +1,6 @@
+URL_QUESTIONS = 'https://stepik.akentev.com/api/millionaire'
+Kuzy = 'https://tlgrm.ru/stickers/sberkot_anim'
+STICK_URL_00 = 'https://s.tcdn.co/91c/0ce/91c0cedc-3745-3756-9b42-638343fab6ad/30.png'
+STICK_URL_03 = 'https://s.tcdn.co/91c/0ce/91c0cedc-3745-3756-9b42-638343fab6ad/29.png'
+STICK_URL_10 = 'https://s.tcdn.co/91c/0ce/91c0cedc-3745-3756-9b42-638343fab6ad/20.png'
+STICK_URL_25 = 'https://s.tcdn.co/91c/0ce/91c0cedc-3745-3756-9b42-638343fab6ad/43.png'
