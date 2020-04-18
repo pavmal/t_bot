@@ -67,7 +67,7 @@ def dispatcher(message):
     """
     if message.text.lower().strip() == '/start':
         bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
-                     'Если хочешь поиграть, напиши: "давай вопрос" или "+"')
+                     'Если хочешь поиграть, напиши:\n"давай вопрос" или "+"')
 
     user_id = str(message.from_user.id)
     if REDIS_URL:  # если подключена база redis
@@ -119,7 +119,7 @@ def handler_new_member(message):
     else:
         u_name = 'Незнакомец(ка)'
     mess = 'Привет, ' + u_name + '!\nЭто бот-игра "Кто хочет стать миллионером"\n' + \
-           'Если хочешь поиграть, напиши: "давай вопрос"'
+           'Если хочешь поиграть, напиши:\n"давай вопрос" или "+"'
     bot.send_message(message, mess)
     all_user_data[user_id]['state'] = BASE_STATE
 
@@ -207,7 +207,7 @@ def base_handler(message):
     if message.text.lower().strip() == '/start':
         pass  # обрабатывается в процедуре диспетчера
     elif message.text.lower().strip() in GREETINGS:
-        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши: "давай вопрос" или "+"'.format(
+        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши:\n"давай вопрос" или "+"'.format(
             str(message.from_user.first_name)))
 
     elif message.text.lower().strip() in CANCEL_QUESTION:
