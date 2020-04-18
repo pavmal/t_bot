@@ -4,49 +4,18 @@ import random, time, os, json
 import requests
 import redis
 import config
+
+# from PIL import Image
 # from itertools import permutations
 
-#bot = telebot.TeleBot(config.token)
+# bot = telebot.TeleBot(config.token)
 bot = telebot.TeleBot(os.environ['BOT_TOKEN'])
 REDIS_URL = os.environ.get('REDIS_URL')
 all_user_data = {}
-#all_user_data_str = ''
-# s = ''
-# with open('temp_data.txt', 'r', encoding='utf-8') as f:
-#     s = f.readline()
-# all_user_data = json.loads(s)
-# print(all_user_data)
-
-def save_data(key, value):
-#    data_str = '{"' + key + '": ' + json.dumps(all_user_data[key]) + '}'
-#    all_user_data_str = json.dumps(all_user_data[key])
-    if REDIS_URL:
-        redis_db = redis.from_url(REDIS_URL)
-        redis_db.set(key, value)
-#    else:
-#        all_user_data[key] = value
-#        open('temp_data.txt', 'w', encoding='utf-8').write(data_str)
-#    print(key, value)
-#    print(all_user_data)
-
-def load_data(key):
-    if REDIS_URL:
-        redis_db = redis.from_url(REDIS_URL)
-        return redis_db.get(key)
-    else:
-#        s = json.load(open('temp_data.txt', 'r', encoding='utf-8'))
-#        data = json.loads(s)
-#        print(type(s), s)
-        return all_user_data.get(key)
-
-
-#IS_HEROKU = os.environ.get('HEROKU', False)
-
-
 
 GREETINGS = ['hi', 'привет']
 GO_TO_QUESTION = ['спроси меня вопрос', 'спроси меня', 'следущий вопрос', 'ещё', 'давай вопрос', 'да', '?', 'вопрос']
-QUESTION_LEVEL = ['1 - разминочный', '2 - средний', '3 - для эрудитов']
+QUESTION_LEVEL = ['выбери уровень сложности вопросов', '1 - разминочный', '2 - средний', '3 - для эрудитов']
 CANCEL_QUESTION = ['не хочу', 'нет', 'надоело', 'достал', 'отвали']
 SHOW_RESULTS = ['покажи счёт', 'какой счёт', 'результат игры', 'счет', 'счёт', 'итог']
 
@@ -66,6 +35,29 @@ def echo(message):
 """
 
 
+def save_data(key, value):
+    """
+    Сохранение данных по игроку в базн
+    """
+    if REDIS_URL:
+        redis_db = redis.from_url(REDIS_URL)
+        redis_db.set(key, value)
+
+
+def load_data(key):
+    """
+    Загрузка сохраненных данных по игроку
+    :param key: id игрока в базе
+    :return: строка со словарем
+    """
+    if REDIS_URL:
+        redis_db = redis.from_url(REDIS_URL)
+        if redis_db.get(key):
+            return redis_db.get(key).decode("utf-8")
+    else:
+        return all_user_data.get(key)
+
+
 @bot.message_handler(func=lambda message: True)
 def dispatcher(message):
     """
@@ -73,21 +65,24 @@ def dispatcher(message):
     :param message: сообщение игрока
     :return: вызов необходимого обработчика с учетом статуса игрока в дереве вопросов
     """
+    if message.text.lower().strip() == '/start':
+        bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
+                     'Если хочешь поиграть, напиши: "давай вопрос"')
+
     user_id = str(message.from_user.id)
-    all_user_data[user_id] = load_data(user_id)
-    print(all_user_data)
-#    if user_id not in all_user_data:
-    if all_user_data[user_id] == None:
+    if REDIS_URL:  # если подключена база redis
+        val_str = load_data(user_id)
+        if val_str:
+            all_user_data[str(user_id)] = json.loads(val_str)
+
+    if (user_id not in all_user_data) or (all_user_data[user_id] == None):
         all_user_data[user_id] = {}
         all_user_data[user_id]['state'] = BASE_STATE
         all_user_data[user_id]['results'] = [0, 0]
         all_user_data[user_id]['faults'] = 0
         all_user_data[user_id]['complex'] = 0
         all_user_data[user_id]['questions'] = {}
-#    else:
-#        pass
-#        all_user_data[user_id] = load_data(user_id)
-#    print(all_user_data)
+    #    print(all_user_data)
 
     if all_user_data[user_id]['state'] == NEW_USER:
         handler_new_member(message)
@@ -97,6 +92,7 @@ def dispatcher(message):
         ask_question(message)
     else:
         bot.reply_to(message, ANSWER_BASE)
+    """ Оставил для возможной обработки фото и стикетов """
     #    photo_handler(message)
     #    sticker_handler(message)
 
@@ -139,11 +135,13 @@ def photo_handler(message):
 @bot.message_handler(content_types=["sticker"])
 def sticker_handler(message):
     user_id = str(message.from_user.id)
-    #    if user_results[user_id][1] == 1:
-    if all_user_data[user_id]['results'][1] == 3:
-        bot.send_message(message, 'Уже взяты подряд 3 вопроса!!!\nТак держать!')
-        time.sleep(1)
-        bot.send_sticker(message.from_user.id, config.STICK_URL_03)
+
+    print(message.sticker.file_id)
+    bot.send_sticker(message.from_user.id, message.sticker.file_id)
+    #    config.OLAF_X = message.sticker.file_id
+    config.OLAF_X = 'CAACAgIAAxkBAAIBqV6a_wVmXbJkxJK_SY9kJrzdEIzAAAK_AAMrXlMLZByzdc6EyDkYBA'
+    print(config.OLAF_X)
+    bot.send_sticker(message.from_user.id, config.OLAF_X)
 
 
 def get_question(q_complex):
@@ -163,6 +161,11 @@ def get_question(q_complex):
 
 
 def reward_winners(wins):
+    """
+    Выбор картинки в зависимости от количества побед игрока
+    :param wins: количество побед
+    :return: ссылка на картинку
+    """
     stik_url = config.STICK_URL_00
     print(stik_url)
     if wins == 3:
@@ -174,6 +177,22 @@ def reward_winners(wins):
     return str(stik_url)
 
 
+def olaf_reward_winners(wins):
+    """
+    Выбор стика в зависимости от количества побед игрока
+    :param wins: количество побед
+    :return: ссылка на картинку
+    """
+    olaf_id = config.OLAF_00
+    if wins == 3:
+        olaf_id = config.OLAF_03
+    if wins == 10:
+        olaf_id = config.OLAF_10
+    if wins == 25:
+        olaf_id = config.OLAF_25
+    return olaf_id
+
+
 def base_handler(message):
     """
     Обработка сообщений на базовом уровне (вход пользователя или после результата игры)
@@ -181,42 +200,44 @@ def base_handler(message):
     :return: Ответ игроку в зависимости от обработки сообщения
     """
     user_id = str(message.from_user.id)
+    result_mess = 'Текущий счет для выбранного уровня:\n' \
+                  'Твоих Побед - {}\n' \
+                  'Поражений - {}'.format(str(all_user_data[user_id]['results'][1]),
+                                          str(all_user_data[user_id]['results'][0]))
+
     if message.text.lower().strip() == '/start':
-        bot.reply_to(message, 'Это бот-игра "Кто хочет стать миллионером"' + '\n' +
-                     'Если хочешь поиграть, напиши: "давай вопрос"')
+        pass  # обрабатывается в процедуре диспетчера
     elif message.text.lower().strip() in GREETINGS:
-        if message.from_user.first_name is not None:
-            bot.reply_to(message, 'Ну, Привет, ' + str(message.from_user.first_name) + '!\n' +
-                         'Если хочешь поиграть, напиши: "давай вопрос"')
-        else:
-            bot.reply_to(message, 'Ну, Привет, Незнакомец(ка)!' + '\n' +
-                         'Если хочешь поиграть, напиши: "давай вопрос"')
+        bot.reply_to(message, 'Ну, Привет, {}!\nЕсли хочешь поиграть, напиши: "давай вопрос"'.format(
+            str(message.from_user.first_name)))
+
     elif message.text.lower().strip() in CANCEL_QUESTION:
-        bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' +
-                     'Результат игры: Твоих Побед - ' + str(all_user_data[user_id]['results'][1]) +
-                     '; Поражений - ' + str(all_user_data[user_id]['results'][0]) +
+        bot.reply_to(message, str(message.from_user.first_name) + ' уже нет сил ??? :(' + '\n' + result_mess +
                      '\nКак надумаешь - возвращайся.\nЯ буду ждать тебя... :)')
+        bot.send_sticker(message.from_user.id, 'CAACAgIAAxkBAAIBeV6a-MlpOZmrxjC5q94yHtt5OeQrAALKAAMrXlMLB2VLhy5mA7sYBA')
+
     elif message.text.lower().strip() in SHOW_RESULTS:
-        bot.reply_to(message, 'Текущий счет: Твоих Побед - ' + str(all_user_data[user_id]['results'][1]) +
-                     '; Поражений - ' + str(all_user_data[user_id]['results'][0]))
+        bot.reply_to(message, result_mess)
+
     elif message.text.lower().strip() in GO_TO_QUESTION or message.text.lower().strip() in QUESTION_LEVEL:
         # проверка того, что это первый вопрос в сессии. Предлагаем выбрать уровень сложности
-        if message.text.lower().strip() == QUESTION_LEVEL[0]:
-            all_user_data[user_id]['complex'] = 1
         if message.text.lower().strip() == QUESTION_LEVEL[1]:
-            all_user_data[user_id]['complex'] = 2
+            all_user_data[user_id]['complex'] = 1
         if message.text.lower().strip() == QUESTION_LEVEL[2]:
+            all_user_data[user_id]['complex'] = 2
+        if message.text.lower().strip() == QUESTION_LEVEL[3]:
             all_user_data[user_id]['complex'] = 3
 
-        if all_user_data[user_id]['complex'] == 0:
+        if all_user_data[user_id]['complex'] == 0 or message.text.lower().strip() == QUESTION_LEVEL[0]:
+            all_user_data[user_id]['results'][0] = 0  # обнуляем число поражений
+            all_user_data[user_id]['results'][1] = 0  # обнуляем число побед
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
-            keyboard.add(types.KeyboardButton(QUESTION_LEVEL[0]),
-                         types.KeyboardButton(QUESTION_LEVEL[1]),
-                         types.KeyboardButton(QUESTION_LEVEL[2]))
+            keyboard.add(types.KeyboardButton(QUESTION_LEVEL[1]),
+                         types.KeyboardButton(QUESTION_LEVEL[2]),
+                         types.KeyboardButton(QUESTION_LEVEL[3]))
             bot.reply_to(message, 'Выбери уровень сложности вопросов', reply_markup=keyboard)
         else:
             all_user_data[user_id]['questions'] = get_question(str(all_user_data[user_id]['complex']))
-
             #    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
             keyboard.add(types.KeyboardButton(all_user_data[user_id]['questions']['answers'][0]),
@@ -230,6 +251,8 @@ def base_handler(message):
             print(all_user_data)
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Если хочешь поиграть, напиши: "давай вопрос"')
+
+    save_data(user_id, json.dumps(all_user_data[user_id]))
 
 
 def ask_question(message):
@@ -247,30 +270,28 @@ def ask_question(message):
         all_user_data[user_id]['state'] = BASE_STATE
         save_data(user_id, json.dumps(all_user_data[user_id]))
         # check for user reward
-        if all_user_data[user_id]['results'][1] in [1, 3, 10, 25]:
-            str_url = reward_winners(all_user_data[user_id]['results'][1])
+        if all_user_data[user_id]['results'][1] in [3, 10, 25]:
             time.sleep(1)
             str_mess = 'Правильно! \nУже взяты подряд ' + str(
                 all_user_data[user_id]['results'][1]) + ' вопросов!!!\nТак держать!'
             if all_user_data[user_id]['results'][1] == 25:
                 str_mess = str_mess + '\nОбъявляю тебя ПОБЕДИТЕЛЕМ ИГРЫ !!!'
-            bot.reply_to(message, str_mess)
-            #            sti = open(str_url, 'rb')
-            #            bot.send_sticker(message.from_user.id, sti)
-            bot.send_sticker(message.from_user.id, str_url)
-        #            bot.send_sticker(message.from_user.id, 'FILEID')
+            bot.reply_to(message, str_mess, reply_markup=types.ReplyKeyboardRemove())
+            # str_url = reward_winners(all_user_data[user_id]['results'][1])  # ссылки на кота Кузю
+            olaf_id = olaf_reward_winners(all_user_data[user_id]['results'][1])
+            try:
+                bot.send_sticker(message.from_user.id, olaf_id)
+            except Exception:
+                """ Почему-то не всегда подхватывается file_id стикера """
+                print('Error show sticker')
+        #     bot.send_sticker(message.from_user.id, 'FILEID')
         else:
-            bot.reply_to(message, 'Правильно! Молодец!!!')
-        # general message for right answer
-        bot.reply_to(message, 'Если хочешь сыграть ещё, напиши: "да", \nесли уже устал, напиши: "нет"',
-                     reply_markup=types.ReplyKeyboardRemove())
+            bot.reply_to(message, 'Правильно! Молодец!!!', reply_markup=types.ReplyKeyboardRemove())
 
     elif (message.text.lower().strip() in str(all_user_data[user_id]['questions']['answers']).lower().strip()):
         all_user_data[user_id]['faults'] += 1
         if (all_user_data[user_id]['faults'] == 2):
-            bot.reply_to(message, 'Неправильно... Увы, ты проиграл :(' + '\n' +
-                         'Если ты готов победить, напиши: "да", \nесли уже устал, напиши: "нет"',
-                         reply_markup=types.ReplyKeyboardRemove())
+            bot.reply_to(message, 'Неправильно... Увы, ты проиграл :(', reply_markup=types.ReplyKeyboardRemove())
             all_user_data[user_id]['faults'] = 0
             all_user_data[user_id]['results'][0] += 1
             # user_results[user_id][1] = 0  # обнуление выйгрышей N подряд вопросов
@@ -282,9 +303,21 @@ def ask_question(message):
             bot.reply_to(message, 'Неправильно :( У тебя ещё одна попытка')
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Выбери один из вариантов ответов')
-#    save_data('user_id')
+    print(all_user_data)
+    save_data(user_id, json.dumps(all_user_data[user_id]))
+
+    #   если ошибочных ответов ноль, то игрок или выйграл или проиграл.
+    #   Предлагаем продолжить, завершить игру или выбрать сложность вопросов
+    if all_user_data[user_id]['faults'] == 0:
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
+        keyboard.add(types.KeyboardButton('Да'),
+                     types.KeyboardButton('Нет'),
+                     types.KeyboardButton(QUESTION_LEVEL[0].capitalize()))
+        bot.reply_to(message, 'Продолжаем играть ?', reply_markup=keyboard)
 
 
 if __name__ == '__main__':
+    #    if REDIS_URL:
+    #        redis_db = redis.from_url(REDIS_URL)
+    #        redis_db.delete('409088886')
     bot.polling()
-
