@@ -1,1 +1,1 @@
-bot: python3 t_millions.pye
+bot: python3 t_millions.py
