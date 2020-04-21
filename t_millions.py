@@ -183,8 +183,8 @@ def olaf_reward_winners(wins):
     :return: ссылка на картинку
     """
     olaf_id = config.OLAF_00
-    if wins == 3:
-        olaf_id = config.OLAF_03
+    if wins == 5:
+        olaf_id = config.OLAF_05
     if wins == 10:
         olaf_id = config.OLAF_10
     if wins == 25:
@@ -264,21 +264,21 @@ def ask_question(message):
     user_id = str(message.from_user.id)
     if (message.text.lower().strip() == (str(all_user_data[user_id]['questions']['right_answer']).lower().strip())):
         bot.send_chat_action(user_id, 'typing')
-        time.sleep(1)
+     #   time.sleep(1)
         all_user_data[user_id]['faults'] = 0
         all_user_data[user_id]['results'][1] += 1
         all_user_data[user_id]['state'] = BASE_STATE
         save_data(user_id, json.dumps(all_user_data[user_id]))
         # check for user reward
-        if all_user_data[user_id]['results'][1] in [3, 10, 25]:
-            time.sleep(1)
+        if all_user_data[user_id]['results'][1] in [5, 10, 25]:
+            # str_url = reward_winners(all_user_data[user_id]['results'][1])  # ссылки на кота Кузю
+            olaf_id = olaf_reward_winners(all_user_data[user_id]['results'][1])
+         #   time.sleep(1)
             str_mess = 'Правильно! \nУже взяты подряд ' + str(
                 all_user_data[user_id]['results'][1]) + ' вопросов!!!\nТак держать!'
             if all_user_data[user_id]['results'][1] == 25:
                 str_mess = str_mess + '\nОбъявляю тебя ПОБЕДИТЕЛЕМ ИГРЫ !!!'
             bot.reply_to(message, str_mess, reply_markup=types.ReplyKeyboardRemove())
-            # str_url = reward_winners(all_user_data[user_id]['results'][1])  # ссылки на кота Кузю
-            olaf_id = olaf_reward_winners(all_user_data[user_id]['results'][1])
             bot.send_sticker(message.from_user.id, olaf_id)
         #     bot.send_sticker(message.from_user.id, 'FILEID')
         else:
@@ -295,7 +295,7 @@ def ask_question(message):
             save_data(user_id, json.dumps(all_user_data[user_id]))
         else:
             bot.send_chat_action(user_id, 'typing')
-            time.sleep(1)
+        #    time.sleep(1)
             bot.reply_to(message, 'Неправильно :( У тебя ещё одна попытка')
     else:
         bot.reply_to(message, ANSWER_BASE + '\n' + 'Выбери один из вариантов ответов')
